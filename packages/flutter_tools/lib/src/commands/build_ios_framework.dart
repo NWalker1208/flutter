@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @dart = 2.8
+
 import 'package:file/file.dart';
 import 'package:meta/meta.dart';
 
@@ -18,7 +20,6 @@ import '../build_system/targets/common.dart';
 import '../build_system/targets/icon_tree_shaker.dart';
 import '../build_system/targets/ios.dart';
 import '../cache.dart';
-import '../convert.dart';
 import '../globals.dart' as globals;
 import '../macos/cocoapod_utils.dart';
 import '../plugins.dart';
@@ -49,7 +50,7 @@ class BuildIOSFrameworkCommand extends BuildSubCommand {
     usesDartDefineOption();
     addSplitDebugInfoOption();
     addDartObfuscationOption();
-    usesExtraDartFlagOptions();
+    usesExtraDartFlagOptions(verboseHelp: verboseHelp);
     addNullSafetyModeOptions(hide: !verboseHelp);
     addEnableExperimentation(hide: !verboseHelp);
 
@@ -73,15 +74,15 @@ class BuildIOSFrameworkCommand extends BuildSubCommand {
               'By default, all build configurations are built.'
       )
       ..addFlag('universal',
-        help: '(Deprecated) Produce universal frameworks that include all valid architectures.',
+        help: '(deprecated) Produce universal frameworks that include all valid architectures.',
         negatable: true,
-        hide: true,
+        hide: !verboseHelp,
       )
       ..addFlag('xcframework',
         help: 'Produce xcframeworks that include all valid architectures.',
         negatable: false,
         defaultsTo: true,
-        hide: true,
+        hide: !verboseHelp,
       )
       ..addFlag('cocoapods',
         help: 'Produce a Flutter.podspec instead of an engine Flutter.xcframework (recommended if host app uses CocoaPods).',
@@ -93,8 +94,8 @@ class BuildIOSFrameworkCommand extends BuildSubCommand {
       )
       ..addFlag('force',
         abbr: 'f',
-        help: 'Force Flutter.podspec creation on the master channel. For testing only.',
-        hide: true
+        help: 'Force Flutter.podspec creation on the master channel. This is only intended for testing the tool itself.',
+        hide: !verboseHelp,
       );
   }
 
@@ -127,7 +128,7 @@ class BuildIOSFrameworkCommand extends BuildSubCommand {
 
   FlutterProject _project;
 
-  Future<List<BuildInfo>> get buildInfos async {
+  Future<List<BuildInfo>> getBuildInfos() async {
     final List<BuildInfo> buildInfos = <BuildInfo>[];
 
     if (boolArg('debug')) {
@@ -154,7 +155,7 @@ class BuildIOSFrameworkCommand extends BuildSubCommand {
     if (boolArg('universal')) {
       throwToolExit('--universal has been deprecated, only XCFrameworks are supported.');
     }
-    if ((await buildInfos).isEmpty) {
+    if ((await getBuildInfos()).isEmpty) {
       throwToolExit('At least one of "--debug" or "--profile", or "--release" is required.');
     }
   }
@@ -173,8 +174,9 @@ class BuildIOSFrameworkCommand extends BuildSubCommand {
     }
 
     final Directory outputDirectory = globals.fs.directory(globals.fs.path.absolute(globals.fs.path.normalize(outputArgument)));
-
-    for (final BuildInfo buildInfo in await buildInfos) {
+    final List<BuildInfo> buildInfos = await getBuildInfos();
+    displayNullSafetyMode(buildInfos.first);
+    for (final BuildInfo buildInfo in buildInfos) {
       final String productBundleIdentifier = await _project.ios.productBundleIdentifier(buildInfo);
       globals.printStatus('Building frameworks for $productBundleIdentifier in ${getNameForBuildMode(buildInfo.mode)} mode...');
       final String xcodeBuildConfiguration = toTitleCase(getNameForBuildMode(buildInfo.mode));
@@ -285,7 +287,7 @@ $licenseSource
 LICENSE
   }
   s.author                = { 'Flutter Dev Team' => 'flutter-dev@googlegroups.com' }
-  s.source                = { :http => '${_cache.storageBaseUrl}/flutter_infra/flutter/${_cache.engineRevision}/$artifactsMode/artifacts.zip' }
+  s.source                = { :http => '${_cache.storageBaseUrl}/flutter_infra_release/flutter/${_cache.engineRevision}/$artifactsMode/artifacts.zip' }
   s.documentation_url     = 'https://flutter.dev/docs'
   s.platform              = :ios, '8.0'
   s.vendored_frameworks   = 'Flutter.xcframework'
@@ -320,7 +322,7 @@ end
 
     try {
       // Copy xcframework engine cache framework to mode directory.
-      globals.fsUtils.copyDirectorySync(
+      copyDirectory(
         globals.fs.directory(engineCacheFlutterFrameworkDirectory),
         flutterFrameworkCopy,
       );
@@ -364,7 +366,7 @@ end
             kBuildMode: getNameForBuildMode(buildInfo.mode),
             kTargetPlatform: getNameForTargetPlatform(TargetPlatform.ios),
             kIconTreeShakerFlag: buildInfo.treeShakeIcons.toString(),
-            kDartDefines: jsonEncode(buildInfo.dartDefines),
+            kDartDefines: encodeDartDefines(buildInfo.dartDefines),
             kBitcodeFlag: 'true',
             if (buildInfo?.extraGenSnapshotOptions?.isNotEmpty ?? false)
               kExtraGenSnapshotOptions:
@@ -383,6 +385,7 @@ end
           engineVersion: globals.artifacts.isLocalEngine
               ? null
               : globals.flutterVersion.engineRevision,
+          generateDartPluginRegistry: true,
         );
         Target target;
         // Always build debug for simulator.
@@ -421,12 +424,6 @@ end
       ' ├─Building plugins...'
     );
     try {
-      // Regardless of the last "flutter build" build mode,
-      // copy the corresponding engine.
-      // A plugin framework built with bitcode must link against the bitcode version
-      // of Flutter.framework (Release).
-      _project.ios.copyEngineArtifactToProject(mode, EnvironmentType.physical);
-
       final String bitcodeGenerationMode = mode == BuildMode.release ?
           'bitcode' : 'marker'; // In release, force bitcode embedding without archiving.
 
