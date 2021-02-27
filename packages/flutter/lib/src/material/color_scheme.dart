@@ -198,7 +198,7 @@ class ColorScheme with Diagnosticable {
       onPrimary: primaryIsDark ? Colors.white : Colors.black,
       onSecondary: secondaryIsDark ? Colors.white : Colors.black,
       onSurface: isDark ? Colors.white : Colors.black,
-      onBackground: primaryIsDark ? Colors.white : Colors.black,
+      onBackground: isDark ? Colors.white : Colors.black,
       onError: isDark ? Colors.black : Colors.white,
       brightness: brightness,
     );

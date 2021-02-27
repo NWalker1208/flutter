@@ -738,14 +738,10 @@ class ThemeData with Diagnosticable {
 
     final bool isDark = colorScheme.brightness == Brightness.dark;
 
-    // For surfaces that use primary color in light themes and surface color in dark
-    final Color primarySurfaceColor = isDark ? colorScheme.surface : colorScheme.primary;
-    final Color onPrimarySurfaceColor = isDark ? colorScheme.onSurface : colorScheme.onPrimary;
-
     return ThemeData(
       brightness: colorScheme.brightness,
-      primaryColor: primarySurfaceColor,
-      primaryColorBrightness: ThemeData.estimateBrightnessForColor(primarySurfaceColor),
+      primaryColor: colorScheme.primary,
+      primaryColorBrightness: ThemeData.estimateBrightnessForColor(colorScheme.primary),
       canvasColor: colorScheme.background,
       accentColor: colorScheme.secondary,
       accentColorBrightness: ThemeData.estimateBrightnessForColor(colorScheme.secondary),
@@ -757,7 +753,7 @@ class ThemeData with Diagnosticable {
       dialogBackgroundColor: colorScheme.background,
       errorColor: colorScheme.error,
       textTheme: textTheme,
-      indicatorColor: onPrimarySurfaceColor,
+      indicatorColor: colorScheme.onPrimary,
       applyElevationOverlayColor: isDark,
       colorScheme: colorScheme,
     );
